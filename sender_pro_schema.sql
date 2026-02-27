@@ -1,0 +1,150 @@
+SET FOREIGN_KEY_CHECKS=0;
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+-- --------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS `Users` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL,
+  `email` VARCHAR(255) NOT NULL UNIQUE,
+  `password` VARCHAR(255) NOT NULL,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `Contacts` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `userId` INT NOT NULL,
+  `name` VARCHAR(255) DEFAULT '',
+  `phone` VARCHAR(255) NOT NULL,
+  `group` VARCHAR(255) DEFAULT 'Default',
+  `tags` JSON DEFAULT NULL,
+  `source` ENUM('manual', 'import', 'group_grab') DEFAULT 'manual',
+  `isWhatsApp` TINYINT(1) DEFAULT NULL,
+  `lastValidated` DATETIME,
+  `variables` JSON DEFAULT NULL,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`userId`) REFERENCES `Users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `Campaigns` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `userId` INT NOT NULL,
+  `name` VARCHAR(255) NOT NULL,
+  `message` TEXT NOT NULL,
+  `mediaUrl` VARCHAR(255) DEFAULT '',
+  `contacts` JSON DEFAULT NULL,
+  `status` ENUM('draft', 'running', 'completed', 'failed') DEFAULT 'draft',
+  `sent` INT DEFAULT 0,
+  `failed` INT DEFAULT 0,
+  `total` INT DEFAULT 0,
+  `delay` INT DEFAULT 3,
+  `startedAt` DATETIME,
+  `finishedAt` DATETIME,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`userId`) REFERENCES `Users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `AutoReplies` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `userId` INT NOT NULL,
+  `trigger` VARCHAR(255) NOT NULL,
+  `triggerType` ENUM('contains', 'exact', 'any') DEFAULT 'contains',
+  `response` TEXT NOT NULL,
+  `mediaUrl` VARCHAR(255) DEFAULT '',
+  `active` TINYINT(1) DEFAULT 1,
+  `order` INT DEFAULT 0,
+  `hitCount` INT DEFAULT 0,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`userId`) REFERENCES `Users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `Schedules` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `userId` INT NOT NULL,
+  `name` VARCHAR(255) NOT NULL,
+  `message` TEXT NOT NULL,
+  `contacts` JSON DEFAULT NULL,
+  `targetGroups` JSON DEFAULT NULL,
+  `mediaUrl` VARCHAR(255) DEFAULT '',
+  `cronExpr` VARCHAR(255) DEFAULT '',
+  `scheduledAt` DATETIME,
+  `isRecurring` TINYINT(1) DEFAULT 1,
+  `active` TINYINT(1) DEFAULT 1,
+  `lastRun` DATETIME,
+  `runCount` INT DEFAULT 0,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`userId`) REFERENCES `Users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `Projects` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `userId` INT NOT NULL,
+  `name` VARCHAR(255) NOT NULL,
+  `description` VARCHAR(255) DEFAULT '',
+  `status` ENUM('active', 'paused') DEFAULT 'active',
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`userId`) REFERENCES `Users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `Automations` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `userId` INT NOT NULL,
+  `projectId` INT NOT NULL,
+  `name` VARCHAR(255) NOT NULL,
+  `triggerType` ENUM('manual', 'schedule') DEFAULT 'manual',
+  `scheduledAt` DATETIME,
+  `status` ENUM('active', 'paused', 'completed') DEFAULT 'active',
+  `targetGroups` JSON DEFAULT NULL,
+  `lastRunAt` DATETIME,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`userId`) REFERENCES `Users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`projectId`) REFERENCES `Projects`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `AutomationSteps` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `automationId` INT NOT NULL,
+  `stepOrder` INT NOT NULL,
+  `actionType` ENUM('send_message', 'delay') NOT NULL,
+  `message` TEXT,
+  `mediaUrl` VARCHAR(255) DEFAULT '',
+  `delayValue` INT DEFAULT 0,
+  `delayUnit` ENUM('minutes', 'hours', 'days') DEFAULT 'minutes',
+  `delayOption` ENUM('duration', 'exact_time') DEFAULT 'duration',
+  `delayUntilDate` DATETIME,
+  `delayMinutes` INT DEFAULT 0,
+  FOREIGN KEY (`automationId`) REFERENCES `Automations`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `AutomationLogs` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `automationId` INT NOT NULL,
+  `groupId` VARCHAR(255) NOT NULL,
+  `stepId` INT,
+  `status` ENUM('success', 'failed', 'pending') DEFAULT 'pending',
+  `error` TEXT,
+  `executedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`automationId`) REFERENCES `Automations`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `GlobalVars` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `userId` INT NOT NULL,
+  `key` VARCHAR(255) NOT NULL,
+  `value` TEXT NOT NULL,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`userId`) REFERENCES `Users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+SET FOREIGN_KEY_CHECKS=1;
+COMMIT;

@@ -1,0 +1,139 @@
+import { useState, useEffect } from 'react';
+import api from '../utils/api';
+import toast from 'react-hot-toast';
+import { Users2, RefreshCw, Download, ChevronDown, ChevronRight, ShieldCheck } from 'lucide-react';
+
+export default function GroupsPage() {
+  const [groups, setGroups] = useState([]);
+  const [expanded, setExpanded] = useState(null);
+  const [parts, setParts] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState({});
+
+  useEffect(() => {
+    loadGroups();
+  }, []);
+
+  const loadGroups = async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/groups');
+      setGroups(data);
+      toast.success(`Found ${data.length} groups`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'WhatsApp not connected');
+    } finally { setLoading(false); }
+  };
+
+  const loadParticipants = async (groupId) => {
+    if (expanded === groupId) { setExpanded(null); return; }
+    setExpanded(groupId);
+    if (parts[groupId]) return;
+    try {
+      const { data } = await api.get(`/groups/${groupId}/participants`);
+      setParts(p => ({ ...p, [groupId]: data }));
+    } catch { toast.error('Failed to load participants'); }
+  };
+
+  const saveToContacts = async (groupId) => {
+    setSaving(s => ({ ...s, [groupId]: true }));
+    try {
+      const { data } = await api.post(`/groups/${groupId}/save`);
+      toast.success(`Saved ${data.saved} contacts`);
+    } catch { toast.error('Failed to save'); }
+    finally { setSaving(s => ({ ...s, [groupId]: false })); }
+  };
+
+  const exportToCSV = (groupId, groupName) => {
+    const participants = parts[groupId];
+    if (!participants || participants.length === 0) {
+      toast.error('Load participants first before exporting');
+      return;
+    }
+
+    const csvContent = "data:text/csv;charset=utf-8,"
+      + "Phone Number,Is Admin\n"
+      + participants.map(p => `${p.phone},${p.isAdmin ? 'Yes' : 'No'}`).join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${groupName.replace(/\s+/g, '_')}_contacts.csv`);
+    document.body.appendChild(link); // Required for FF
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Downloaded as CSV');
+  };
+
+  return (
+    <div className="fade-in">
+      <div className="page-header">
+        <div>
+          <div className="page-title">Group Grabber</div>
+          <div className="page-sub">Extract contacts from your WhatsApp groups</div>
+        </div>
+        <button className="btn btn-primary" onClick={loadGroups} disabled={loading}>
+          <RefreshCw size={14} className={loading ? 'spin' : ''} />
+          {loading ? 'Loading...' : 'Fetch Groups'}
+        </button>
+      </div>
+
+      {groups.length === 0 ? (
+        <div className="empty-state card">
+          <Users2 size={48} />
+          <h3>No Groups Loaded</h3>
+          <p>Click "Fetch Groups" to load your WhatsApp groups</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {groups.map(g => (
+            <div key={g.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              {/* Group header */}
+              <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
+                onClick={() => loadParticipants(g.id)}>
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(124,58,237,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Users2 size={18} color="var(--accent3)" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 14 }}>{g.name}</div>
+                  <div style={{ color: 'var(--text3)', fontSize: 12 }}>{g.participantCount} participants</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }}
+                    onClick={e => { e.stopPropagation(); saveToContacts(g.id); }}
+                    disabled={saving[g.id]}>
+                    <Download size={13} /> {saving[g.id] ? 'Saving...' : 'Save to Contacts'}
+                  </button>
+                  <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', border: '1px solid var(--border)' }}
+                    onClick={e => { e.stopPropagation(); exportToCSV(g.id, g.name); }}
+                    disabled={!parts[g.id]}>
+                    <Download size={13} /> Export CSV
+                  </button>
+                  {expanded === g.id ? <ChevronDown size={16} color="var(--text3)" /> : <ChevronRight size={16} color="var(--text3)" />}
+                </div>
+              </div>
+
+              {/* Participants */}
+              {expanded === g.id && (
+                <div style={{ borderTop: '1px solid var(--border)', padding: '16px 20px' }}>
+                  {!parts[g.id] ? (
+                    <p style={{ color: 'var(--text3)', fontSize: 13 }}>Loading participants...</p>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8, maxHeight: 240, overflowY: 'auto' }}>
+                      {parts[g.id].map(p => (
+                        <div key={p.phone} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: 'var(--bg2)', borderRadius: 8 }}>
+                          {p.isAdmin && <ShieldCheck size={12} color="var(--yellow)" />}
+                          <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text2)' }}>{p.phone}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
