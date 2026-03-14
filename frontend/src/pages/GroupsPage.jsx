@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
-import { Users2, RefreshCw, Download, ChevronDown, ChevronRight, ShieldCheck } from 'lucide-react';
+import { Users2, RefreshCw, Download, ChevronDown, ChevronRight, ShieldCheck, Search } from 'lucide-react';
 
 export default function GroupsPage() {
   const [groups, setGroups] = useState([]);
+  const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState(null);
   const [parts, setParts] = useState({});
   const [loading, setLoading] = useState(false);
@@ -65,6 +66,8 @@ export default function GroupsPage() {
     toast.success('Downloaded as CSV');
   };
 
+  const filteredGroups = groups.filter(g => g.name.toLowerCase().includes(search.toLowerCase()));
+
   return (
     <div className="fade-in">
       <div className="page-header">
@@ -85,53 +88,71 @@ export default function GroupsPage() {
           <p>Click "Fetch Groups" to load your WhatsApp groups</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {groups.map(g => (
-            <div key={g.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              {/* Group header */}
-              <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
-                onClick={() => loadParticipants(g.id)}>
-                <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(124,58,237,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Users2 size={18} color="var(--accent3)" />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 14 }}>{g.name}</div>
-                  <div style={{ color: 'var(--text3)', fontSize: 12 }}>{g.participantCount} participants</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }}
-                    onClick={e => { e.stopPropagation(); saveToContacts(g.id); }}
-                    disabled={saving[g.id]}>
-                    <Download size={13} /> {saving[g.id] ? 'Saving...' : 'Save to Contacts'}
-                  </button>
-                  <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', border: '1px solid var(--border)' }}
-                    onClick={e => { e.stopPropagation(); exportToCSV(g.id, g.name); }}
-                    disabled={!parts[g.id]}>
-                    <Download size={13} /> Export CSV
-                  </button>
-                  {expanded === g.id ? <ChevronDown size={16} color="var(--text3)" /> : <ChevronRight size={16} color="var(--text3)" />}
-                </div>
-              </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Search Box */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg2)', border: '1px solid var(--border)', padding: '10px 16px', borderRadius: 12 }}>
+            <Search size={18} color="var(--text3)" />
+            <input
+              type="text"
+              placeholder="Search groups by name..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--text)', fontSize: 14, width: '100%' }}
+            />
+          </div>
 
-              {/* Participants */}
-              {expanded === g.id && (
-                <div style={{ borderTop: '1px solid var(--border)', padding: '16px 20px' }}>
-                  {!parts[g.id] ? (
-                    <p style={{ color: 'var(--text3)', fontSize: 13 }}>Loading participants...</p>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8, maxHeight: 240, overflowY: 'auto' }}>
-                      {parts[g.id].map(p => (
-                        <div key={p.phone} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: 'var(--bg2)', borderRadius: 8 }}>
-                          {p.isAdmin && <ShieldCheck size={12} color="var(--yellow)" />}
-                          <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text2)' }}>{p.phone}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {filteredGroups.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text3)' }}>No groups found matching "{search}"</div>
+            ) : (
+              filteredGroups.map(g => (
+                <div key={g.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                  {/* Group header */}
+                  <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
+                    onClick={() => loadParticipants(g.id)}>
+                    <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(124,58,237,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Users2 size={18} color="var(--accent3)" />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 14 }}>{g.name}</div>
+                      <div style={{ color: 'var(--text3)', fontSize: 12 }}>{g.participantCount} participants</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }}
+                        onClick={e => { e.stopPropagation(); saveToContacts(g.id); }}
+                        disabled={saving[g.id]}>
+                        <Download size={13} /> {saving[g.id] ? 'Saving...' : 'Save to Contacts'}
+                      </button>
+                      <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', border: '1px solid var(--border)' }}
+                        onClick={e => { e.stopPropagation(); exportToCSV(g.id, g.name); }}
+                        disabled={!parts[g.id]}>
+                        <Download size={13} /> Export CSV
+                      </button>
+                      {expanded === g.id ? <ChevronDown size={16} color="var(--text3)" /> : <ChevronRight size={16} color="var(--text3)" />}
+                    </div>
+                  </div>
+
+                  {/* Participants */}
+                  {expanded === g.id && (
+                    <div style={{ borderTop: '1px solid var(--border)', padding: '16px 20px' }}>
+                      {!parts[g.id] ? (
+                        <p style={{ color: 'var(--text3)', fontSize: 13 }}>Loading participants...</p>
+                      ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8, maxHeight: 240, overflowY: 'auto' }}>
+                          {parts[g.id].map(p => (
+                            <div key={p.phone} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: 'var(--bg2)', borderRadius: 8 }}>
+                              {p.isAdmin && <ShieldCheck size={12} color="var(--yellow)" />}
+                              <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text2)' }}>{p.phone}</span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          ))}
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>

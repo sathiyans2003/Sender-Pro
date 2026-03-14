@@ -10,6 +10,7 @@
     "axios": "^1.4.0",
     "react-hot-toast": "^2.4.1",
     "lucide-react": "^0.263.1",
+    "emoji-picker-react": "^4.11.1",
     "react-scripts": "5.0.1"
   },
   "scripts": {

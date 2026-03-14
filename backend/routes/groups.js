@@ -5,7 +5,7 @@ const Contact = require('../models/Contact');
 const router = express.Router();
 
 router.get('/', protect, async (req, res) => {
-  const client = req.app.get('whatsappClient')();
+  const client = req.app.get('getClientForUser')(req.user.id, req.user.role === 'superadmin');
   if (!client) return res.status(400).json({ message: 'WhatsApp not connected' });
   try {
     const chats = await client.getChats();
@@ -22,7 +22,7 @@ router.get('/', protect, async (req, res) => {
 });
 
 router.get('/:groupId/participants', protect, async (req, res) => {
-  const client = req.app.get('whatsappClient')();
+  const client = req.app.get('getClientForUser')(req.user.id, req.user.role === 'superadmin');
   if (!client) return res.status(400).json({ message: 'WhatsApp not connected' });
   try {
     const chat = await client.getChatById(req.params.groupId);
@@ -39,7 +39,7 @@ router.get('/:groupId/participants', protect, async (req, res) => {
 
 // Save group participants as contacts
 router.post('/:groupId/save', protect, async (req, res) => {
-  const client = req.app.get('whatsappClient')();
+  const client = req.app.get('getClientForUser')(req.user.id, req.user.role === 'superadmin');
   if (!client) return res.status(400).json({ message: 'WhatsApp not connected' });
   try {
     const chat = await client.getChatById(req.params.groupId);

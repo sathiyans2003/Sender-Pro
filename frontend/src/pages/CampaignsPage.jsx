@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
-import { Plus, Play, Trash2, Megaphone, RotateCcw, X, RefreshCw, Upload, Image, File } from 'lucide-react';
+import { Plus, Play, Trash2, Megaphone, RotateCcw, X, RefreshCw, Upload, Image, File, Download } from 'lucide-react';
 
 const STATUS_BADGE = {
   draft: 'badge-purple',
@@ -17,6 +17,7 @@ export default function CampaignsPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState({ name: '', message: '', delay: 3, mediaUrl: '', phones: '', group: '' });
+  const [selectedCampaign, setSelectedCampaign] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -111,6 +112,26 @@ export default function CampaignsPage() {
     toast.success('Deleted');
   };
 
+  const downloadReport = (campaign) => {
+    if (!campaign.results || campaign.results.length === 0) {
+      return toast.error('No detailed results recorded for this campaign (try restarting it).');
+    }
+
+    const headers = ['Phone', 'Name', 'Status', 'Time', 'Error'];
+    const csvContent = [
+      headers.join(','),
+      ...campaign.results.map(r =>
+        `"${r.phone || ''}","${r.name || ''}","${r.status || ''}","${r.time ? new Date(r.time).toLocaleString() : ''}","${(r.error || '').replace(/"/g, '""')}"`
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `report_${campaign.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
   const groups = [...new Set(contacts.map(c => c.group))];
   const progress = (c) => c.total > 0 ? Math.round(((c.sent + c.failed) / c.total) * 100) : 0;
 
@@ -138,7 +159,7 @@ export default function CampaignsPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {campaigns.map(c => (
-            <div key={c.id} className="card">
+            <div key={c.id} className="card" style={{ cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => setSelectedCampaign(c)}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
                 <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(124,58,237,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Megaphone size={18} color="var(--accent3)" />
@@ -169,17 +190,22 @@ export default function CampaignsPage() {
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
                   {c.status === 'draft' && (
-                    <button className="btn btn-success" style={{ padding: '7px 14px' }} onClick={() => startCampaign(c.id)}>
+                    <button className="btn btn-success" style={{ padding: '7px 14px' }} onClick={(e) => { e.stopPropagation(); startCampaign(c.id); }}>
                       <Play size={13} /> Start
                     </button>
                   )}
                   {c.status === 'failed' && (
-                    <button className="btn btn-primary" style={{ padding: '7px 14px', fontSize: 12 }} onClick={() => resendCampaign(c.id)}>
+                    <button className="btn btn-primary" style={{ padding: '7px 14px', fontSize: 12 }} onClick={(e) => { e.stopPropagation(); resendCampaign(c.id); }}>
                       <RotateCcw size={13} /> Resend
                     </button>
                   )}
+                  {(c.status === 'completed' || c.status === 'failed') && c.results && c.results.length > 0 && (
+                    <button className="btn btn-secondary" style={{ padding: '7px 14px', fontSize: 12, background: 'rgba(34,197,94,0.1)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.3)' }} onClick={(e) => { e.stopPropagation(); downloadReport(c); }}>
+                      <Download size={13} /> Report
+                    </button>
+                  )}
                   {c.status !== 'running' && (
-                    <button className="btn btn-danger" style={{ padding: '7px 10px' }} onClick={() => deleteCampaign(c.id)}>
+                    <button className="btn btn-danger" style={{ padding: '7px 10px' }} onClick={(e) => { e.stopPropagation(); deleteCampaign(c.id); }}>
                       <Trash2 size={13} />
                     </button>
                   )}
@@ -187,6 +213,82 @@ export default function CampaignsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Campaign Details View Modal */}
+      {selectedCampaign && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }} onClick={e => e.target === e.currentTarget && setSelectedCampaign(null)}>
+          <div className="card fade-in" style={{ width: '100%', maxWidth: 700, maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg2)', padding: 0 }}>
+            <div style={{ padding: '24px 24px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h3 style={{ fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: 18, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Megaphone size={18} color="var(--accent3)" /> {selectedCampaign.name}
+                </h3>
+                <div style={{ fontSize: 13, color: 'var(--text3)', marginTop: 4 }}>
+                  Started: {selectedCampaign.startedAt ? new Date(selectedCampaign.startedAt).toLocaleString() : 'Not started'} · Status: <span style={{ color: selectedCampaign.status === 'completed' ? 'var(--green)' : selectedCampaign.status === 'failed' ? 'var(--red)' : 'var(--yellow)' }}>{selectedCampaign.status}</span>
+                </div>
+              </div>
+              <button onClick={() => setSelectedCampaign(null)} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', color: 'var(--text2)', padding: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: 24, background: 'var(--card)' }}>
+              <div style={{ marginBottom: 24 }}>
+                <div className="label">Message Content</div>
+                <div style={{ background: 'var(--bg3)', padding: 14, borderRadius: 10, color: 'var(--text2)', fontSize: 13.5, whiteSpace: 'pre-wrap', border: '1px solid var(--border)' }}>
+                  {selectedCampaign.message}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <h4 style={{ fontSize: 14, color: 'var(--text)' }}>Delivery Log ({selectedCampaign.results?.length || 0} numbers)</h4>
+                {(selectedCampaign.status === 'completed' || selectedCampaign.status === 'failed') && selectedCampaign.results && selectedCampaign.results.length > 0 && (
+                  <button className="btn btn-secondary" style={{ padding: '6px 14px', fontSize: 12, background: 'rgba(34,197,94,0.1)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.3)' }} onClick={(e) => { e.stopPropagation(); downloadReport(selectedCampaign); }}>
+                    <Download size={13} /> Export Excel/CSV
+                  </button>
+                )}
+              </div>
+
+              <div style={{ background: 'var(--bg)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
+                <table className="table" style={{ fontSize: 13 }}>
+                  <thead style={{ background: 'var(--bg2)' }}>
+                    <tr>
+                      <th style={{ padding: '12px 16px' }}>Phone Number</th>
+                      <th style={{ padding: '12px 16px' }}>Name</th>
+                      <th style={{ padding: '12px 16px' }}>Status</th>
+                      <th style={{ padding: '12px 16px' }}>Error Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedCampaign.results && selectedCampaign.results.length > 0 ? (
+                      selectedCampaign.results.map((r, i) => (
+                        <tr key={i} style={{ background: r.status === 'failed' ? 'rgba(239, 68, 68, 0.05)' : 'transparent' }}>
+                          <td style={{ fontWeight: 600 }}>{r.phone}</td>
+                          <td style={{ color: 'var(--text2)' }}>{r.name || 'Unknown'}</td>
+                          <td>
+                            <span className={`badge ${r.status === 'sent' ? 'badge-green' : 'badge-red'}`} style={{ padding: '2px 8px', fontSize: 11 }}>
+                              {r.status === 'sent' ? 'Delivered' : 'Failed'}
+                            </span>
+                          </td>
+                          <td style={{ color: 'var(--red)', fontSize: 12, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {r.error || '-'}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" style={{ textAlign: 'center', padding: 30, color: 'var(--text3)' }}>
+                          No tracking logs yet. {selectedCampaign.status === 'draft' ? 'Start campaign to track deliveries.' : 'Please wait while or restart backend to fix.'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

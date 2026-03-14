@@ -3,15 +3,16 @@ import { useWhatsApp } from '../hooks/useWhatsApp';
 import { Wifi, WifiOff, Loader, Smartphone, Link2Off } from 'lucide-react';
 
 const STATUS_CONFIG = {
-  connected:    { color: 'var(--green)',  badge: 'badge-green',  label: 'Connected'   },
-  disconnected: { color: 'var(--red)',    badge: 'badge-red',    label: 'Disconnected' },
-  connecting:   { color: 'var(--yellow)', badge: 'badge-yellow', label: 'Connecting...' },
-  qr:           { color: 'var(--yellow)', badge: 'badge-yellow', label: 'Scan QR Code' },
-  auth_failure: { color: 'var(--red)',    badge: 'badge-red',    label: 'Auth Failed'  },
+  connected: { color: 'var(--green)', badge: 'badge-green', label: 'Connected' },
+  disconnected: { color: 'var(--red)', badge: 'badge-red', label: 'Disconnected' },
+  connecting: { color: 'var(--yellow)', badge: 'badge-yellow', label: 'Connecting...' },
+  qr: { color: 'var(--yellow)', badge: 'badge-yellow', label: 'Scan QR Code' },
+  auth_failure: { color: 'var(--red)', badge: 'badge-red', label: 'Auth Failed' },
+  mismatch: { color: 'var(--red)', badge: 'badge-red', label: 'Number Mismatch' },
 };
 
 export default function WhatsAppPage() {
-  const { status, qrCode, phone, waName, connect, disconnect } = useWhatsApp();
+  const { status, qrCode, phone, waName, errorMsg, connect, disconnect } = useWhatsApp();
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.disconnected;
 
   return (
@@ -31,8 +32,8 @@ export default function WhatsAppPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28, padding: '16px', background: 'var(--bg2)', borderRadius: 12, border: '1px solid var(--border)' }}>
             <div style={{ width: 48, height: 48, borderRadius: 14, background: `${cfg.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {status === 'connected' ? <Wifi size={22} color={cfg.color} /> :
-               status === 'connecting' || status === 'qr' ? <Loader size={22} color={cfg.color} className="spin" /> :
-               <WifiOff size={22} color={cfg.color} />}
+                status === 'connecting' || status === 'qr' ? <Loader size={22} color={cfg.color} className="spin" /> :
+                  <WifiOff size={22} color={cfg.color} />}
             </div>
             <div>
               <span className={`badge ${cfg.badge}`}>{cfg.label}</span>
@@ -44,6 +45,12 @@ export default function WhatsAppPage() {
               )}
             </div>
           </div>
+          {/* Display specific error if available */}
+          {errorMsg && (
+            <div style={{ padding: 12, background: 'rgba(239,68,68,0.1)', color: '#ef4444', borderRadius: 8, fontSize: 13, marginBottom: 20, border: '1px solid rgba(239,68,68,0.3)' }}>
+              <strong>Error:</strong> {errorMsg}
+            </div>
+          )}
 
           {/* Actions */}
           {status !== 'connected' ? (

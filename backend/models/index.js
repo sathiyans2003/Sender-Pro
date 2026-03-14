@@ -6,6 +6,14 @@ const User = sequelize.define('User', {
   name: { type: DataTypes.STRING, allowNull: false },
   email: { type: DataTypes.STRING, allowNull: false, unique: true },
   password: { type: DataTypes.STRING, allowNull: false },
+  whatsappNumber: { type: DataTypes.STRING }, // Stores the permanently locked WhatsApp number
+  role: { type: DataTypes.ENUM('user', 'admin', 'subaccount'), defaultValue: 'user' }, // The true DB type
+  isAdmin: { type: DataTypes.BOOLEAN, defaultValue: false }, // Legacy support
+  subStatus: { type: DataTypes.ENUM('trial', 'active', 'expired', 'none'), defaultValue: 'none' },
+  subExpiry: { type: DataTypes.DATE, defaultValue: null },
+  parentId: { type: DataTypes.INTEGER, defaultValue: null },
+  otp: { type: DataTypes.STRING },
+  otpExpires: { type: DataTypes.DATE },
   resetPasswordToken: { type: DataTypes.STRING },
   resetPasswordExpire: { type: DataTypes.DATE },
 }, {
@@ -26,6 +34,40 @@ User.prototype.matchPassword = async function (enteredPassword) {
   return await require('bcryptjs').compare(enteredPassword, this.password);
 };
 
+const SuperAdmin = sequelize.define('SuperAdmin', {
+  name: { type: DataTypes.STRING, allowNull: false, defaultValue: 'Super Admin' },
+  email: { type: DataTypes.STRING, allowNull: false, unique: true },
+  whatsappNumber: { type: DataTypes.STRING },
+  password: { type: DataTypes.STRING, allowNull: false },
+  resetPasswordToken: { type: DataTypes.STRING },
+  resetPasswordExpire: { type: DataTypes.DATE },
+  otp: { type: DataTypes.STRING },
+  otpExpires: { type: DataTypes.DATE },
+}, {
+  timestamps: true,
+  hooks: {
+    beforeCreate: async (admin) => {
+      admin.password = await require('bcryptjs').hash(admin.password, 10);
+    },
+    beforeUpdate: async (admin) => {
+      if (admin.changed('password')) {
+        admin.password = await require('bcryptjs').hash(admin.password, 10);
+      }
+    }
+  }
+});
+
+SuperAdmin.prototype.matchPassword = async function (enteredPassword) {
+  return await require('bcryptjs').compare(enteredPassword, this.password);
+};
+
+User.prototype.hasActiveSubscription = function () {
+  if (this.role === 'subaccount' || this.parentId) return true;
+  if (this.subStatus === 'active' && this.subExpiry && new Date(this.subExpiry) > new Date()) return true;
+  if (this.subStatus === 'trial' && this.subExpiry && new Date(this.subExpiry) > new Date()) return true;
+  return false;
+};
+
 const Contact = sequelize.define('Contact', {
   userId: { type: DataTypes.INTEGER, allowNull: false },
   name: { type: DataTypes.STRING, defaultValue: '' },
@@ -44,6 +86,7 @@ const Campaign = sequelize.define('Campaign', {
   message: { type: DataTypes.TEXT, allowNull: false },
   mediaUrl: { type: DataTypes.STRING, defaultValue: '' },
   contacts: { type: DataTypes.JSON, defaultValue: [] },
+  results: { type: DataTypes.JSON, defaultValue: [] },
   status: { type: DataTypes.ENUM('draft', 'running', 'completed', 'failed'), defaultValue: 'draft' },
   sent: { type: DataTypes.INTEGER, defaultValue: 0 },
   failed: { type: DataTypes.INTEGER, defaultValue: 0 },
@@ -51,6 +94,7 @@ const Campaign = sequelize.define('Campaign', {
   delay: { type: DataTypes.INTEGER, defaultValue: 3 },
   startedAt: { type: DataTypes.DATE },
   finishedAt: { type: DataTypes.DATE },
+  isSuper: { type: DataTypes.BOOLEAN, defaultValue: false },
 }, { timestamps: true });
 
 const AutoReply = sequelize.define('AutoReply', {
@@ -61,6 +105,7 @@ const AutoReply = sequelize.define('AutoReply', {
   mediaUrl: { type: DataTypes.STRING, defaultValue: '' },
   active: { type: DataTypes.BOOLEAN, defaultValue: true },
   order: { type: DataTypes.INTEGER, defaultValue: 0 },
+  delayHours: { type: DataTypes.INTEGER, defaultValue: 24 },
   hitCount: { type: DataTypes.INTEGER, defaultValue: 0 },
 }, { timestamps: true });
 
@@ -77,6 +122,7 @@ const Schedule = sequelize.define('Schedule', {
   active: { type: DataTypes.BOOLEAN, defaultValue: true },
   lastRun: { type: DataTypes.DATE },
   runCount: { type: DataTypes.INTEGER, defaultValue: 0 },
+  isSuper: { type: DataTypes.BOOLEAN, defaultValue: false },
 }, { timestamps: true });
 
 const Project = sequelize.define('Project', {
@@ -95,6 +141,7 @@ const Automation = sequelize.define('Automation', {
   status: { type: DataTypes.ENUM('active', 'paused', 'completed'), defaultValue: 'active' },
   targetGroups: { type: DataTypes.JSON, defaultValue: [] },
   lastRunAt: { type: DataTypes.DATE },
+  isSuper: { type: DataTypes.BOOLEAN, defaultValue: false },
 }, { timestamps: true });
 
 const AutomationStep = sequelize.define('AutomationStep', {
@@ -125,7 +172,34 @@ const GlobalVar = sequelize.define('GlobalVar', {
   value: { type: DataTypes.STRING, allowNull: false },
 }, { timestamps: true });
 
+// ── Subscription / Payment model ───────────────────────────────
+const Subscription = sequelize.define('Subscription', {
+  userId: { type: DataTypes.INTEGER, allowNull: false },
+  plan: { type: DataTypes.STRING, allowNull: false },          // 'monthly', 'quarterly', 'yearly'
+  amount: { type: DataTypes.INTEGER, allowNull: false },          // in paise (INR * 100)
+  currency: { type: DataTypes.STRING, defaultValue: 'INR' },
+  status: { type: DataTypes.ENUM('pending', 'paid', 'failed'), defaultValue: 'pending' },
+  razorpayOrderId: { type: DataTypes.STRING },
+  razorpayPaymentId: { type: DataTypes.STRING },
+  razorpaySignature: { type: DataTypes.STRING },
+  startDate: { type: DataTypes.DATE },
+  endDate: { type: DataTypes.DATE },
+  notes: { type: DataTypes.STRING, defaultValue: '' },
+}, { timestamps: true });
+
+// ── Support Ticket model ───────────────────────────────
+const SupportTicket = sequelize.define('SupportTicket', {
+  userId: { type: DataTypes.INTEGER, allowNull: false },
+  subject: { type: DataTypes.STRING, allowNull: false },
+  message: { type: DataTypes.TEXT, allowNull: false },
+  status: { type: DataTypes.ENUM('open', 'resolved', 'closed'), defaultValue: 'open' },
+  adminReply: { type: DataTypes.TEXT, defaultValue: '' },
+}, { timestamps: true });
+
 // Setup associations
+User.hasMany(User, { foreignKey: 'parentId', as: 'subAccounts' });
+User.belongsTo(User, { foreignKey: 'parentId', as: 'parentAdmin' });
+
 User.hasMany(Contact, { foreignKey: 'userId', as: 'userContacts' });
 Contact.belongsTo(User, { foreignKey: 'userId' });
 
@@ -156,6 +230,12 @@ AutomationLog.belongsTo(Automation, { foreignKey: 'automationId' });
 User.hasMany(GlobalVar, { foreignKey: 'userId' });
 GlobalVar.belongsTo(User, { foreignKey: 'userId' });
 
+User.hasMany(Subscription, { foreignKey: 'userId' });
+Subscription.belongsTo(User, { foreignKey: 'userId' });
+
+User.hasMany(SupportTicket, { foreignKey: 'userId' });
+SupportTicket.belongsTo(User, { foreignKey: 'userId' });
+
 module.exports = {
   sequelize,
   User,
@@ -167,5 +247,8 @@ module.exports = {
   Automation,
   AutomationStep,
   AutomationLog,
-  GlobalVar
+  GlobalVar,
+  Subscription,
+  SuperAdmin,
+  SupportTicket
 };

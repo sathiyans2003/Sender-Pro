@@ -22,6 +22,10 @@ const sendEmail = async (options) => {
         html: options.html, // Optional HTML format
     };
 
+    if (options.replyTo) {
+        message.replyTo = options.replyTo;
+    }
+
     // Send the email
     const info = await transporter.sendMail(message);
     console.log('Message sent: %s', info.messageId);

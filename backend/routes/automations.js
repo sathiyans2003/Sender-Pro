@@ -67,6 +67,7 @@ router.post('/projects/:projectId/automations', protect, async (req, res) => {
         const { name, triggerType, scheduledAt, targetGroups } = req.body;
         const automation = await Automation.create({
             userId: req.user.id,
+            isSuper: req.user.role === 'superadmin',
             projectId: req.params.projectId,
             name,
             triggerType,
@@ -157,8 +158,10 @@ router.post('/:id/run', protect, async (req, res) => {
             res.json({ message: 'Automation activated & scheduled for later', automation });
         } else {
             // Non-blocking trigger
-            const getClient = req.app.get('whatsappClient');
-            runAutomation(automation.id, getClient).catch(err => console.error(err));
+            const client = req.app.get('getClientForUser')(req.user.id, automation.isSuper);
+            if (!client) return res.status(400).json({ error: 'WhatsApp not connected. Please connect your WhatsApp first.' });
+
+            runAutomation(automation.id, client).catch(err => console.error(err));
             res.json({ message: 'Automation Started Now', automation });
         }
     } catch (err) {

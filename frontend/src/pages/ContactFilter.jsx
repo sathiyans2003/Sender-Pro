@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
-import { Search, Filter, X, Download, Users, ChevronDown, Check, Trash2 } from 'lucide-react';
+import { Search, Filter, X, Download, Users, ChevronDown, Check, Trash2, Edit2, Save } from 'lucide-react';
 
 // ── Helpers ──────────────────────────────────────────────────
 function matchesFilter(contact, filters) {
@@ -46,6 +46,8 @@ export default function ContactFilter({ onFilteredContacts }) {
   const [showPanel, setShowPanel] = useState(false);
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', phone: '', group: '' });
 
   const [filters, setFilters] = useState({
     search: '',
@@ -122,6 +124,22 @@ export default function ContactFilter({ onFilteredContacts }) {
       setAllContacts(prev => prev.filter(c => c.id !== id));
       toast.success('Contact deleted');
     } catch { toast.error('Failed to delete contact'); }
+  };
+
+  const startEdit = (contact) => {
+    setEditingId(contact.id);
+    setEditForm({ name: contact.name || '', phone: contact.phone || '', group: typeof contact.group === 'object' ? contact.group.name : (contact.group || '') });
+  };
+
+  const saveEdit = async (id) => {
+    try {
+      const { data } = await api.put(`/contacts/${id}`, editForm);
+      setAllContacts(prev => prev.map(c => c.id === id ? data : c));
+      setEditingId(null);
+      toast.success('Contact updated');
+    } catch (err) {
+      toast.error('Failed to update contact');
+    }
   };
 
   // Delete multiple selected contacts
@@ -351,32 +369,57 @@ export default function ContactFilter({ onFilteredContacts }) {
                         style={{ cursor: 'pointer' }}
                       />
                     </td>
-                    <td style={{ fontFamily: 'monospace', fontSize: 13 }}>{c.phone}</td>
-                    <td style={{ color: 'var(--text)', fontWeight: 500 }}>{c.name || <span style={{ color: 'var(--text3)', fontStyle: 'italic' }}>No name</span>}</td>
-                    <td><span className="badge badge-purple">{typeof c.group === 'object' ? c.group.name : c.group}</span></td>
-                    <td>
-                      <span className={`badge ${c.source === 'import' ? 'badge-yellow' : c.source === 'group_grab' ? 'badge-green' : 'badge-purple'}`}>
-                        {c.source}
-                      </span>
-                    </td>
-                    <td>
-                      {c.isWhatsApp === true && <span className="badge badge-green">Yes</span>}
-                      {c.isWhatsApp === false && <span className="badge badge-red">No</span>}
-                      {c.isWhatsApp === null && <span className="badge badge-ghost">Pending</span>}
-                    </td>
-                    <td style={{ fontSize: 12, color: 'var(--text3)' }}>
-                      {new Date(c.createdAt).toLocaleDateString()}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <button
-                        className="btn btn-ghost"
-                        style={{ color: 'var(--red)', padding: '5px' }}
-                        onClick={() => deleteContact(c.id)}
-                        title="Delete Contact"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
+                    {editingId === c.id ? (
+                      <>
+                        <td><input className="input" style={{ padding: '4px 8px', fontSize: 13 }} value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} /></td>
+                        <td><input className="input" style={{ padding: '4px 8px', fontSize: 13 }} value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} placeholder="Name" /></td>
+                        <td><input className="input" style={{ padding: '4px 8px', fontSize: 13 }} value={editForm.group} onChange={e => setEditForm(f => ({ ...f, group: e.target.value }))} placeholder="Group" /></td>
+                        <td><span className="badge badge-yellow">Editing</span></td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button className="btn btn-success" style={{ padding: '5px' }} onClick={() => saveEdit(c.id)} title="Save"><Save size={14} /></button>
+                          <button className="btn btn-ghost" style={{ padding: '5px', marginLeft: 4 }} onClick={() => setEditingId(null)} title="Cancel"><X size={14} /></button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td style={{ fontFamily: 'monospace', fontSize: 13 }}>{c.phone}</td>
+                        <td style={{ color: 'var(--text)', fontWeight: 500 }}>{c.name || <span style={{ color: 'var(--text3)', fontStyle: 'italic' }}>No name</span>}</td>
+                        <td><span className="badge badge-purple">{typeof c.group === 'object' ? c.group.name : c.group}</span></td>
+                        <td>
+                          <span className={`badge ${c.source === 'import' ? 'badge-yellow' : c.source === 'group_grab' ? 'badge-green' : 'badge-purple'}`}>
+                            {c.source}
+                          </span>
+                        </td>
+                        <td>
+                          {c.isWhatsApp === true && <span className="badge badge-green">Yes</span>}
+                          {c.isWhatsApp === false && <span className="badge badge-red">No</span>}
+                          {c.isWhatsApp === null && <span className="badge badge-ghost">Pending</span>}
+                        </td>
+                        <td style={{ fontSize: 12, color: 'var(--text3)' }}>
+                          {new Date(c.createdAt).toLocaleDateString()}
+                        </td>
+                        <td style={{ textAlign: 'center', display: 'flex', gap: 4, justifyContent: 'center' }}>
+                          <button
+                            className="btn btn-ghost"
+                            style={{ color: 'var(--accent3)', padding: '5px' }}
+                            onClick={() => startEdit(c)}
+                            title="Edit Contact"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            className="btn btn-ghost"
+                            style={{ color: 'var(--red)', padding: '5px' }}
+                            onClick={() => deleteContact(c.id)}
+                            title="Delete Contact"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>

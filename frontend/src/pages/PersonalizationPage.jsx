@@ -56,7 +56,7 @@ export default function PersonalizationPage() {
                 </div>
             </div>
 
-            <div className="grid" style={{ gridTemplateColumns: '1fr 1.2fr', gap: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 24 }}>
 
                 {/* Global Variables Section */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -110,7 +110,7 @@ export default function PersonalizationPage() {
                     </div>
 
                     <div className="card" style={{ padding: 24 }}>
-                        <h4 style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+                        <h4 style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, marginTop: 10 }}>
                             <HelpCircle size={18} color="var(--accent3)" /> Usage Guide
                         </h4>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
@@ -123,7 +123,7 @@ export default function PersonalizationPage() {
                 </div>
 
                 {/* Contact Statistics Section */}
-                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div className="card" style={{ padding: 5, overflow: 'hidden' }}>
                     <div style={{ padding: 18, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
                         <UserCheck size={18} color="var(--accent3)" />
                         <h4 style={{ fontSize: 14 }}>Contacts with Individual Variables</h4>

@@ -11,8 +11,8 @@ router.get('/', protect, async (req, res) => {
 });
 
 router.post('/', protect, async (req, res) => {
-  const { trigger, triggerType, response, mediaUrl, order } = req.body;
-  const rule = await AutoReply.create({ userId: req.user.id, trigger, triggerType, response, mediaUrl, order });
+  const { trigger, triggerType, response, mediaUrl, order, delayHours } = req.body;
+  const rule = await AutoReply.create({ userId: req.user.id, trigger, triggerType, response, mediaUrl, order, delayHours });
   res.status(201).json(rule);
 });
 

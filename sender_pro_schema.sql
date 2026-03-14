@@ -10,6 +10,14 @@ CREATE TABLE IF NOT EXISTS `Users` (
   `name` VARCHAR(255) NOT NULL,
   `email` VARCHAR(255) NOT NULL UNIQUE,
   `password` VARCHAR(255) NOT NULL,
+  `whatsappNumber` VARCHAR(255) DEFAULT NULL,
+  `role` ENUM('user', 'admin', 'subaccount') DEFAULT 'user',
+  `isAdmin` TINYINT(1) DEFAULT 0,
+  `subStatus` ENUM('trial', 'active', 'expired', 'none') DEFAULT 'none',
+  `subExpiry` DATETIME DEFAULT NULL,
+  `parentId` INT DEFAULT NULL,
+  `resetPasswordToken` VARCHAR(255) DEFAULT NULL,
+  `resetPasswordExpire` DATETIME DEFAULT NULL,
   `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -145,6 +153,21 @@ CREATE TABLE IF NOT EXISTS `GlobalVars` (
   `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (`userId`) REFERENCES `Users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `SuperAdmins` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL DEFAULT 'Super Admin',
+  `email` VARCHAR(255) NOT NULL UNIQUE,
+  `password` VARCHAR(255) NOT NULL,
+  `resetPasswordToken` VARCHAR(255) DEFAULT NULL,
+  `resetPasswordExpire` DATETIME DEFAULT NULL,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Default password is 'smdigitalworks' (hashed using bcrypt)
+INSERT IGNORE INTO `SuperAdmins` (`name`, `email`, `password`) VALUES 
+('Super Admin', 'smdigitalworks1@gmail.com', '$2a$10$vO/qFqS8h/A.R9f9/HqSze8r2o0t70Qf05tNqG4PZpA.1/16H5fRC');
 
 SET FOREIGN_KEY_CHECKS=1;
 COMMIT;

@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { User, SuperAdmin } = require('../models');
 
 module.exports = async (req, res, next) => {
   const auth = req.headers.authorization;
@@ -8,7 +8,19 @@ module.exports = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(auth.split(' ')[1], process.env.JWT_SECRET);
-    req.user = await User.findByPk(decoded.id, { attributes: { exclude: ['password'] } });
+    if (decoded.role === 'superadmin') {
+      req.user = await SuperAdmin.findByPk(decoded.id, { attributes: { exclude: ['password'] } });
+      if (req.user) req.user.role = 'superadmin';
+    } else {
+      req.user = await User.findByPk(decoded.id, { attributes: { exclude: ['password'] } });
+      if (req.user) {
+        // Use the DB role column if set, otherwise fall back to legacy isAdmin check
+        if (!req.user.role || req.user.role === 'user') {
+          req.user.role = req.user.isAdmin ? 'admin' : (req.user.parentId ? 'subaccount' : 'user');
+        }
+      }
+    }
+
     if (!req.user) return res.status(401).json({ message: 'User not found' });
     next();
   } catch {

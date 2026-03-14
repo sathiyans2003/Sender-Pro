@@ -84,7 +84,7 @@ router.delete('/', protect, async (req, res) => {
 // POST validate whatsapp status
 router.post('/validate', protect, async (req, res) => {
   const { ids } = req.body;
-  const client = req.app.get('whatsappClient')();
+  const client = req.app.get('getClientForUser')(req.user.id);
   if (!client) return res.status(400).json({ message: 'WhatsApp not connected' });
 
   const contacts = await Contact.findAll({ where: { id: ids, userId: req.user.id } });

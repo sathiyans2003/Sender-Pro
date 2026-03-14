@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
-import { Plus, Bot, Trash2, X, Upload, Image, FileText } from 'lucide-react';
-
+import { Plus, Bot, Trash2, X, Upload, Image, FileText, Bold, Italic, Type, Smile, Edit3 } from 'lucide-react';
+import EmojiPicker from 'emoji-picker-react';
 const COMMON_EMOJIS = ['😊', '😂', '❤️', '👍', '🙏', '🔥', '✨', '🎉', '✅', '❌', '🛑', '👇', '👉', '🚀', '💰'];
 
 const TRIGGER_TYPES = [
@@ -14,7 +14,7 @@ const TRIGGER_TYPES = [
 export default function AutoReplyPage() {
   const [rules, setRules] = useState([]);
   const [showNew, setShowNew] = useState(false);
-  const [form, setForm] = useState({ trigger: '', triggerType: 'contains', response: '', mediaUrl: '' });
+  const [form, setForm] = useState({ trigger: '', triggerType: 'contains', response: '', mediaUrl: '', delayHours: 24 });
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
@@ -27,11 +27,17 @@ export default function AutoReplyPage() {
   const addRule = async (e) => {
     e.preventDefault();
     try {
-      const { data } = await api.post('/autoreply', form);
-      setRules(r => [data, ...r]);
+      if (form.id) {
+        const { data } = await api.put(`/autoreply/${form.id}`, form);
+        setRules(r => r.map(x => x.id === form.id ? data : x));
+        toast.success('Rule updated');
+      } else {
+        const { data } = await api.post('/autoreply', form);
+        setRules(r => [data, ...r]);
+        toast.success('Rule added');
+      }
       setShowNew(false);
-      setForm({ trigger: '', triggerType: 'contains', response: '', mediaUrl: '' });
-      toast.success('Rule added');
+      setForm({ trigger: '', triggerType: 'contains', response: '', mediaUrl: '', delayHours: 24 });
     } catch { toast.error('Failed'); }
   };
 
@@ -68,6 +74,26 @@ export default function AutoReplyPage() {
     };
   };
 
+  const [showEmojis, setShowEmojis] = useState(false);
+
+  const insertText = (before, after = '') => {
+    const textarea = document.getElementById('autoreply-textarea');
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = form.response || '';
+    const selected = text.substring(start, end);
+
+    const newText = text.substring(0, start) + before + selected + after + text.substring(end);
+    setForm(f => ({ ...f, response: newText }));
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + before.length, end + before.length);
+    }, 0);
+  };
+
   return (
     <div className="fade-in">
       <div className="page-header">
@@ -75,7 +101,7 @@ export default function AutoReplyPage() {
           <div className="page-title">Auto Reply</div>
           <div className="page-sub">Automatically respond to incoming messages</div>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={14} /> Add Rule</button>
+        <button className="btn btn-primary" onClick={() => { setForm({ trigger: '', triggerType: 'contains', response: '', mediaUrl: '', delayHours: 24 }); setShowNew(true); }}><Plus size={14} /> Add Rule</button>
       </div>
 
       {/* Info banner */}
@@ -103,6 +129,9 @@ export default function AutoReplyPage() {
                     {rule.triggerType !== 'any' && (
                       <code style={{ background: 'var(--bg3)', padding: '2px 8px', borderRadius: 6, fontSize: 12, color: 'var(--accent3)' }}>{rule.trigger}</code>
                     )}
+                    {(rule.delayHours && rule.delayHours > 0) ? (
+                      <span style={{ fontSize: 11, color: 'var(--text3)', background: 'var(--bg2)', padding: '2px 8px', borderRadius: 10 }}>Delay: {rule.delayHours} hrs</span>
+                    ) : null}
                   </div>
                   <div style={{ color: 'var(--text2)', fontSize: 13, background: 'var(--bg2)', padding: '10px 14px', borderRadius: 10, borderLeft: '3px solid var(--accent)' }}>
                     {rule.mediaUrl && (
@@ -118,6 +147,9 @@ export default function AutoReplyPage() {
                     <input type="checkbox" checked={rule.active} onChange={() => toggle(rule.id)} />
                     <span className="toggle-slider" />
                   </label>
+                  <button className="btn btn-ghost" style={{ padding: '6px 10px', color: 'var(--accent)' }} onClick={() => { setForm(rule); setShowNew(true); }}>
+                    <Edit3 size={13} />
+                  </button>
                   <button className="btn btn-danger" style={{ padding: '6px 10px' }} onClick={() => deleteRule(rule.id)}>
                     <Trash2 size={13} />
                   </button>
@@ -129,10 +161,10 @@ export default function AutoReplyPage() {
       )}
 
       {showNew && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }} onClick={e => e.target === e.currentTarget && setShowNew(false)}>
-          <div className="card fade-in" style={{ width: '100%', maxWidth: 480 }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }} onClick={e => e.target === e.currentTarget && setShowNew(false)}>
+          <div className="card fade-in" style={{ width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <h3 style={{ fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: 17 }}>New Auto Reply Rule</h3>
+              <h3 style={{ fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: 17 }}>{form.id ? 'Edit Auto Reply Rule' : 'New Auto Reply Rule'}</h3>
               <button onClick={() => setShowNew(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)' }}><X size={18} /></button>
             </div>
             <form onSubmit={addRule}>
@@ -149,16 +181,47 @@ export default function AutoReplyPage() {
                 </div>
               )}
               <div className="form-group">
+                <label className="label">Reply Delay (in Hours) - Optional</label>
+                <input type="number" className="input" min="0" placeholder="e.g. 24" value={form.delayHours === 0 ? '' : form.delayHours} onChange={e => setForm(f => ({ ...f, delayHours: parseInt(e.target.value) || 0 }))} />
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Time to wait before sending this auto-reply again to the same person. (0 for immediate/always)</div>
+              </div>
+              <div className="form-group">
                 <label className="label">Reply Message *</label>
-                <textarea className="textarea" placeholder="Hi! Thanks for reaching out. We'll get back to you soon." value={form.response} onChange={e => setForm(f => ({ ...f, response: e.target.value }))} required={!form.mediaUrl} />
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                  {COMMON_EMOJIS.map(emoji => (
-                    <button key={emoji} type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}
-                      onClick={() => setForm(f => ({ ...f, response: f.response + emoji }))}
-                    >{emoji}</button>
-                  ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
+                  <button type="button" className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => insertText('*', '*')}>
+                    <Bold size={14} />
+                  </button>
+                  <button type="button" className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => insertText('_', '_')}>
+                    <Italic size={14} />
+                  </button>
+                  <button type="button" className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => insertText('~', '~')}>
+                    <span style={{ textDecoration: 'line-through' }}>S</span>
+                  </button>
+                  <button type="button" className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => insertText('```', '```')}>
+                    <Type size={14} />
+                  </button>
+                  <div style={{ position: 'relative' }}>
+                    <button type="button" className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => setShowEmojis(!showEmojis)}>
+                      <Smile size={14} />
+                    </button>
+                    {showEmojis && (
+                      <div style={{ position: 'absolute', bottom: '100%', left: 0, zIndex: 100, marginBottom: 10 }}>
+                        <EmojiPicker
+                          onEmojiClick={(emojiData) => {
+                            insertText(emojiData.emoji);
+                            setShowEmojis(false);
+                          }}
+                          width={300}
+                          height={400}
+                          searchDisabled={false}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                <textarea id="autoreply-textarea" className="textarea" placeholder="Hi! Thanks for reaching out. We'll get back to you soon." value={form.response} onChange={e => setForm(f => ({ ...f, response: e.target.value }))} required={!form.mediaUrl} />
 
                 <div style={{ marginTop: 12, display: 'flex', gap: 10, alignItems: 'center', background: 'var(--bg2)', padding: '10px', borderRadius: 8 }}>
                   <label className="btn btn-ghost" style={{ border: '1px dashed var(--border)', cursor: 'pointer', padding: '6px 12px', fontSize: 12 }}>

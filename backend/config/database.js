@@ -14,6 +14,13 @@ const sequelize = new Sequelize(
         dialect: isMySQL ? 'mysql' : 'sqlite',
         storage: isMySQL ? undefined : path.join(__dirname, '..', 'sender_pro.sqlite'),
         logging: false,
+        define: {
+            charset: 'utf8mb4',
+            collate: 'utf8mb4_unicode_ci'
+        },
+        dialectOptions: isMySQL ? {
+            charset: 'utf8mb4'
+        } : {}
     }
 );
 

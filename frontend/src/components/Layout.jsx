@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import SubscriptionPopup from './SubscriptionPopup';
 import {
   LayoutDashboard, MessageSquare, Users, Users2,
-  Megaphone, Bot, Clock, LogOut, ChevronLeft, ChevronRight, Zap, Filter, Send, Wand2, CalendarClock
+  Megaphone, Bot, Clock, LogOut, ChevronLeft, ChevronRight, Zap, Filter, Send, Wand2, CalendarClock,
+  CreditCard, Crown, HeadphonesIcon, User
 } from 'lucide-react';
 
 const nav = [
@@ -19,12 +21,22 @@ const nav = [
   { to: '/schedule', icon: Clock, label: 'Schedule' },
   { isDivider: true, label: 'MULTIPLE SETUP' },
   { to: '/group-automation', icon: CalendarClock, label: 'Group Automation' },
+  { isDivider: true, label: 'ACCOUNT' },
+  { to: '/pricing', icon: CreditCard, label: 'Subscription' },
+  { to: '/profile', icon: User, label: 'My Profile' },
+  { to: '/support', icon: HeadphonesIcon, label: 'Helpdesk Support' },
 ];
 
+// Pages accessible WITHOUT subscription (only dashboard + pricing + profile + support)
+const FREE_PAGES = ['/dashboard', '/pricing', '/profile', '/support'];
+
 export default function Layout() {
-  const { user, logout } = useAuth();
+  const { user, logout, isSubscribed } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+
+  const needsSubscription = !isSubscribed && !FREE_PAGES.some(p => location.pathname.startsWith(p));
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -52,7 +64,7 @@ export default function Layout() {
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: '14px 10px', overflowY: 'auto' }}>
-          {nav.map((item, i) => {
+          {nav.filter(item => !(user?.role === 'subaccount' && item.to === '/pricing')).map((item, i) => {
             if (item.isDivider) {
               return !collapsed ? (
                 <div key={i} style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginTop: 15, marginBottom: 5, paddingLeft: 14, letterSpacing: '0.05em' }}>
@@ -60,8 +72,23 @@ export default function Layout() {
                 </div>
               ) : <div key={i} style={{ height: 15 }} />;
             }
-
             const { to, icon: Icon, label } = item;
+            if (item.external) {
+              return (
+                <a key={item.label} href={item.to} target="_blank" rel="noreferrer" style={({ isActive }) => ({
+                  display: 'flex', alignItems: 'center', gap: 11,
+                  padding: collapsed ? '10px 0' : '10px 14px',
+                  borderRadius: 10, marginBottom: 3, textDecoration: 'none',
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  color: 'var(--text3)', background: 'transparent',
+                  fontWeight: 400, fontSize: 13.5, transition: 'all 0.15s',
+                })}>
+                  <Icon size={17} />
+                  {!collapsed && item.label}
+                </a>
+              );
+            }
+
             return (
               <NavLink key={to} to={to} style={({ isActive }) => ({
                 display: 'flex', alignItems: 'center', gap: 11,
@@ -81,12 +108,39 @@ export default function Layout() {
           })}
         </nav>
 
-        {/* User + Logout */}
         <div style={{ padding: collapsed ? '14px 0' : '14px 14px', borderTop: '1px solid var(--border)' }}>
+          {(user?.role === 'superadmin' || user?.isAdmin) && (
+            <button
+              onClick={() => navigate('/admin')}
+              className="btn"
+              style={{
+                width: '100%', marginBottom: 10,
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                padding: collapsed ? '9px 0' : '9px 12px',
+                background: user?.role === 'superadmin' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'var(--primary)',
+                color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: 10, borderRadius: 10, cursor: 'pointer', fontWeight: 600
+              }}
+            >
+              <Crown size={15} color={user?.role === 'superadmin' ? '#fff' : 'currentColor'} />
+              {!collapsed && 'Admin Portal'}
+            </button>
+          )}
+
           {!collapsed && (
             <div style={{ marginBottom: 10, padding: '8px 10px', background: 'var(--bg3)', borderRadius: 10 }}>
               <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name}</div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 6 }}>{user?.email}</div>
+
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '4px 8px', borderRadius: 20,
+                background: localStorage.getItem('wa_phone') ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                color: localStorage.getItem('wa_phone') ? '#22c55e' : '#ef4444',
+                fontSize: 10, fontWeight: 700
+              }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: localStorage.getItem('wa_phone') ? '#22c55e' : '#ef4444' }} />
+                {localStorage.getItem('wa_phone') ? `+${localStorage.getItem('wa_phone')}` : 'Not Connected'}
+              </div>
             </div>
           )}
           <button onClick={handleLogout} className="btn btn-danger" style={{ width: '100%', justifyContent: collapsed ? 'center' : 'flex-start', padding: collapsed ? '9px 0' : undefined }}>
@@ -108,8 +162,10 @@ export default function Layout() {
       </aside>
 
       {/* Main */}
-      <main style={{ flex: 1, overflow: 'auto', background: 'var(--bg)', padding: '28px 32px' }}>
+      <main style={{ flex: 1, overflow: 'auto', background: 'var(--bg)', padding: '28px 32px', position: 'relative' }}>
         <Outlet />
+        {/* Subscription wall - blocks feature access */}
+        {needsSubscription && <SubscriptionPopup />}
       </main>
     </div>
   );
